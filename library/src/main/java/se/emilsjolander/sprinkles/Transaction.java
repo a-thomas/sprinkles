@@ -1,10 +1,13 @@
 package se.emilsjolander.sprinkles;
 
 import android.content.ContentValues;
+import android.database.SQLException;
 import android.database.sqlite.SQLiteDatabase;
 
 import java.util.ArrayList;
 import java.util.List;
+
+import timber.log.Timber;
 
 /**
  * Transaction represents a database transaction in sprinkles.
@@ -12,68 +15,73 @@ import java.util.List;
  */
 public final class Transaction {
 
-	interface OnTransactionCommittedListener {
-		void onTransactionCommitted();
-	}
+    interface OnTransactionCommittedListener {
+        void onTransactionCommitted();
+    }
 
-	private SQLiteDatabase mDb;
-	private boolean mSuccessful;
-	private List<OnTransactionCommittedListener> mOnTransactionCommittedListeners = new ArrayList<OnTransactionCommittedListener>();
+    private SQLiteDatabase mDb;
+    private boolean mSuccessful;
+    private List<OnTransactionCommittedListener> mOnTransactionCommittedListeners = new ArrayList<OnTransactionCommittedListener>();
 
-	public Transaction() {
-		mDb = Sprinkles.getDatabase();
-		mDb.beginTransaction();
-	}
+    public Transaction() {
+        mDb = Sprinkles.getDatabase();
+        mDb.beginTransaction();
+    }
 
     /**
      * Mark a transaction as successful before calling finish() to commit the transaction.
-     * @param successful
-     *      Whether or not the transaction was successful
+     *
+     * @param successful Whether or not the transaction was successful
      */
-	public void setSuccessful(boolean successful) {
-		mSuccessful = successful;
-	}
+    public void setSuccessful(boolean successful) {
+        mSuccessful = successful;
+    }
 
     /**
      * Just a getting for the successful property
      *
      * @return if the transaction is marked as successful or not
      */
-	public boolean isSuccessful() {
-		return mSuccessful;
-	}
+    public boolean isSuccessful() {
+        return mSuccessful;
+    }
 
     /**
      * Finish the transaction.
      * This will commit or rollback the transaction depending on whether is was marked as successful or not
      */
-	public void finish() {
-		if (mSuccessful) {
-			mDb.setTransactionSuccessful();
-		}
-		mDb.endTransaction();
+    public void finish() {
+        if (mSuccessful) {
+            mDb.setTransactionSuccessful();
+        }
+        mDb.endTransaction();
 
-		if (mSuccessful) {
-			for (OnTransactionCommittedListener listener : mOnTransactionCommittedListeners) {
-				listener.onTransactionCommitted();
-			}
-		}
-	}
+        if (mSuccessful) {
+            for (OnTransactionCommittedListener listener : mOnTransactionCommittedListeners) {
+                listener.onTransactionCommitted();
+            }
+        }
+    }
 
-	long insert(String table, ContentValues values) {
-		return mDb.insert(table, null, values);
-	}
+    long insert(String table, ContentValues values) {
+        try {
+            return mDb.insert(table, null, values);
+        } catch (SQLException e) {
+            Timber.e(e, "Error inserting " + values);
+            return -1;
+        }
+    }
 
-	int update(String table, ContentValues values, String where) {
-		return mDb.update(table, values, where, null);
-	}
+    int update(String table, ContentValues values, String where) {
+        return mDb.update(table, values, where, null);
+    }
 
-	int delete(String table, String where) {
-		return mDb.delete(table, where, null);
-	}
+    int delete(String table, String where) {
+        return mDb.delete(table, where, null);
+    }
 
-	void addOnTransactionCommittedListener(OnTransactionCommittedListener listener) {
-		mOnTransactionCommittedListeners.add(listener);
-	}
+    void addOnTransactionCommittedListener(OnTransactionCommittedListener listener) {
+        mOnTransactionCommittedListeners.add(listener);
+    }
 
 }
